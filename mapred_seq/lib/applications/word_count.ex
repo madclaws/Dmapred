@@ -7,8 +7,10 @@ defmodule WordCount do
   @impl true
   def map_fn(key, value) do
     IO.puts("counting #{key}")
+
     value
-    |> String.split(~r{[^a-zA-Z]}) # This was cooool
+    # This was cooool
+    |> String.split(~r{[^a-zA-Z]})
     |> Enum.filter(fn str -> str !== "" end)
     |> Enum.reduce([], fn word, kv_list ->
       [{String.upcase(word), "1"} | kv_list]
@@ -24,8 +26,8 @@ defmodule WordCount do
   # \W -> \W -> Matches any character , ie not a word character(alphanumeric + underscore)
   # [^a-zA-Z] -> matches all non alphabets.
 
-  #Fuck evolution, it affects some :)
-  #Fuck songs, it affects some :)
+  # Fuck evolution, it affects some :)
+  # Fuck songs, it affects some :)
 
   # 39, will miss you
 end
