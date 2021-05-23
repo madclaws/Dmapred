@@ -1,21 +1,21 @@
 # Dmapred
 
-**TODO: Add description**
+**Distributed MapReduce Systems in Elixir**
 
-## Installation
+## Goal
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
-by adding `dmapred` to your list of dependencies in `mix.exs`:
-
-```elixir
-def deps do
-  [
-    {:dmapred, "~> 0.1.0"}
-  ]
-end
+## Running
 ```
+mix deps.get && mix compile
+```
+Master and all workers should be run on different terminals/windows.
+### Starting Master
+``` make start_master ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at [https://hexdocs.pm/dmapred](https://hexdocs.pm/dmapred).
+### Starting Workers
+``` make start_worker1 ```
+``` make start_worker2 ```
+``` make start_worker3 ```
+
+
 
