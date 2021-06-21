@@ -11,8 +11,10 @@ defmodule Dmapred.Master do
   @type master_state :: %{
           name: atom(),
           input_files: list(String.t()),
+          # Map of Dmapred.Task.t()
           tasks: %{},
-          task_count: number()
+          task_count: number(),
+          app: atom()
         }
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
@@ -31,7 +33,7 @@ defmodule Dmapred.Master do
     Logger.info("Master started #{inspect(opts)}")
     dirname = "../resources"
     input_files = File.ls!(dirname) |> Enum.map(fn input_file -> "#{dirname}/#{input_file}" end)
-    {:ok, %{name: :master, input_files: input_files, tasks: %{}, task_count: 0}}
+    {:ok, %{name: :master, input_files: input_files, tasks: %{}, task_count: 0, app: WordCount}}
   end
 
   @impl true
@@ -46,7 +48,7 @@ defmodule Dmapred.Master do
   defp get_task(_worker_id, %{input_files: []} = state), do: get_idle_task(state)
 
   defp get_task(worker_id, %{input_files: [h | t], task_count: tcount} = state) do
-    task = create_map_task(h, tcount + 1, worker_id)
+    task = create_map_task(h, tcount + 1, worker_id, state.app)
 
     state = %{
       state
@@ -58,20 +60,29 @@ defmodule Dmapred.Master do
     {task, state}
   end
 
-  @spec create_map_task(String.t(), number(), atom()) :: Dmapred.Task.t()
-  defp create_map_task(input_file, id, worker_id) do
-    Dmapred.Task.new(id, :map, :in_progress, worker_id, input_file)
+  @spec create_map_task(String.t(), number(), atom(), atom()) :: Dmapred.Task.t()
+  defp create_map_task(input_file, id, worker_id, app) do
+    Dmapred.Task.new(id, :map, :in_progress, worker_id, input_file, app)
   end
 
   @spec get_idle_task(master_state()) :: {Dmapred.Task.t() | nil, master_state()}
   defp get_idle_task(%{tasks: tasks} = state) do
-    idle_tasks = Enum.filter(tasks, fn {_task_id, task} ->
-      task.status === :idle
-    end)
+    idle_tasks =
+      Enum.filter(tasks, fn {_task_id, task} ->
+        task.status === :idle
+      end)
+
     case List.first(idle_tasks) do
-      nil -> {nil, state}
-      idle_task -> task = Map.values(idle_task) |> List.first() |> Map.update!(:status, fn _status -> :in_progress end)
-                   {task, %{state | tasks: Map.update(state.tasks, task.id, task, fn _ -> task end)}}
+      nil ->
+        {nil, state}
+
+      idle_task ->
+        task =
+          Map.values(idle_task)
+          |> List.first()
+          |> Map.update!(:status, fn _status -> :in_progress end)
+
+        {task, %{state | tasks: Map.update(state.tasks, task.id, task, fn _ -> task end)}}
     end
   end
 end

@@ -7,7 +7,8 @@ defmodule Dmapred.Task do
           type: work_type(),
           status: work_status(),
           worker: atom(),
-          input: String.t() | nil
+          input: String.t() | nil,
+          app: atom()
         }
 
   defstruct(
@@ -15,17 +16,19 @@ defmodule Dmapred.Task do
     type: :map,
     status: :idle,
     worker: nil,
-    input: nil
+    input: nil,
+    app: nil
   )
 
-  @spec new(number(), work_type(), work_status(), String.t(), atom()) :: Dmapred.Task.t()
-  def new(id, type, status, worker_id, input) do
+  @spec new(number(), work_type(), work_status(), String.t(), atom(), atom()) :: Dmapred.Task.t()
+  def new(id, type, status, worker_id, input, app) do
     %Dmapred.Task{
       id: id,
       type: type,
       status: status,
       input: input,
-      worker: worker_id
+      worker: worker_id,
+      app: app
     }
   end
 end

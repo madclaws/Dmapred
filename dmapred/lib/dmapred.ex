@@ -2,17 +2,6 @@ defmodule Dmapred do
   @moduledoc """
   Documentation for `Dmapred`.
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Dmapred.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
+  @callback map_fn(key :: any(), value :: any()) :: list({key :: any(), value :: any()})
+  @callback reduce_fn(key :: any(), values :: list()) :: any()
 end
