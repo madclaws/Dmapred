@@ -75,11 +75,7 @@ defmodule Dmapred.Worker do
 
     intermediate_files =
       File.ls!("intermediates/")
-      |> Enum.filter(fn file ->
-        String.split(file, "-")
-        |> List.last()
-        |> String.to_integer() === reducer
-      end)
+      |> Enum.filter(&is_correct_reducer_file?(&1, reducer))
 
     Logger.info(inspect(intermediate_files))
     io_device = File.open!("outputs/mr-out-#{reducer}", [:write, :append, :utf8])
@@ -88,6 +84,12 @@ defmodule Dmapred.Worker do
   end
 
   defp execute_task(_task), do: Logger.info("Invalid Task")
+
+  defp is_correct_reducer_file?(file, reducer) do
+    String.split(file, "-")
+    |> List.last()
+    |> String.to_integer() === reducer
+  end
 
   defp store_intermediate_output(kv_list) do
     intermediate_chunks =

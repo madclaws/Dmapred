@@ -9,7 +9,6 @@ defmodule WordCount do
     IO.puts("counting #{key}")
 
     value
-    # This was cooool
     |> String.split(~r{[^a-zA-Z]})
     |> Enum.filter(fn str -> str !== "" end)
     |> Enum.reduce([], fn word, kv_list ->
@@ -22,12 +21,4 @@ defmodule WordCount do
     Enum.count(values)
   end
 
-  # Regex using and was used
-  # \W -> \W -> Matches any character , ie not a word character(alphanumeric + underscore)
-  # [^a-zA-Z] -> matches all non alphabets.
-
-  # Fuck evolution, it affects some :)
-  # Fuck songs, it affects some :)
-
-  # 39, will miss you
 end
