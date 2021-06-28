@@ -3,7 +3,7 @@
 **Distributed MapReduce Systems in Elixir**
 
 ## Goal
-
+Demos of distributed system
 ## Running
 ```
 mix deps.get && mix compile
