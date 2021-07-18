@@ -8,6 +8,8 @@ defmodule Dmapred.Worker do
 
   require Logger
 
+  @ping_interval 5_000
+
   @type worker_state :: %{
           name: atom(),
           status: :idle | :busy
@@ -20,13 +22,9 @@ defmodule Dmapred.Worker do
     GenServer.start_link(__MODULE__, opts, name: {:global, Keyword.fetch!(opts, :name)})
   end
 
-  def reduce_task(worker_id) do
-    GenServer.cast({:global, worker_id}, "reduce_task_test")
-  end
-
   # server callbacks
   @impl true
-  @spec init(any) :: {:ok, worker_state()}
+  @spec init(keyword()) :: {:ok, worker_state()}
   def init(name: process_name) do
     Logger.info("Worker started #{inspect(process_name)}")
     connect_to_master()
@@ -36,35 +34,44 @@ defmodule Dmapred.Worker do
   @impl true
   def handle_cast({"request_task", worker_id}, state) do
     task = Dmapred.Master.give_task(worker_id)
-    Logger.info("Task Received #{inspect(task)}")
-    execute_task(task)
-    {:noreply, state}
+    Logger.info("Task Received \n #{inspect(task)}")
+
+    # A 1 second delay is to set the worker busy
+    Process.send_after(self(), {:execute_task, task}, 1_000)
+    {:noreply, %{state | status: :busy}}
   end
 
-  @impl true
-  def handle_cast("reduce_task_test", state) do
-    execute_task(%Dmapred.Task{
-      id: 2,
-      type: :reduce,
-      status: :in_progress,
-      input: "",
-      worker: :worker_2,
-      app: WordCount
-    })
+  # @impl true
+  # def handle_cast("reduce_task_test", state) do
+  #   execute_task(%Dmapred.Task{
+  #     id: 2,
+  #     type: :reduce,
+  #     status: :in_progress,
+  #     input: "",
+  #     worker: :worker_2,
+  #     app: WordCount
+  #   })
 
-    {:noreply, state}
-  end
+  #   {:noreply, state}
+  # end
 
   @impl true
   def handle_info("ping_master", %{name: name, status: :idle} = worker_state) do
+    Logger.warn("#{name} is idle, requesting task from master")
     GenServer.cast(self(), {"request_task", name})
-    Process.send_after(self(), "ping_master", 3_000)
+    Process.send_after(self(), "ping_master", @ping_interval)
     {:noreply, worker_state}
   end
 
-  def handle_info("ping_master", worker_state) do
-    Process.send_after(self(), "ping_master", 3_000)
+  def handle_info("ping_master", %{name: name} = worker_state) do
+    Logger.warn("#{name} is busy")
+    Process.send_after(self(), "ping_master", @ping_interval)
     {:noreply, worker_state}
+  end
+
+  def handle_info({:execute_task, task}, state) do
+    :ok = execute_task(task)
+    {:noreply, %{state | status: :idle}}
   end
 
   @spec connect_to_master() :: any()
@@ -79,11 +86,14 @@ defmodule Dmapred.Worker do
     end
   end
 
+  @spec execute_task(task :: Dmapred.Task.t()) :: :ok
   defp execute_task(%Dmapred.Task{type: :map} = task) do
     # (k, v) -> List({k, v})
     content = File.read!(task.input)
     intermediate = task.app.map_fn(task.input, content)
-    store_intermediate_output(intermediate)
+    store_intermediate_output(intermediate, task.id)
+    Logger.warn("Map task #{task.id} finished...")
+    :ok
   end
 
   defp execute_task(%Dmapred.Task{type: :reduce} = task) do
@@ -98,9 +108,13 @@ defmodule Dmapred.Worker do
     io_device = File.open!("outputs/mr-out-#{reducer}", [:write, :append, :utf8])
     Enum.each(intermediate_files, &apply_reduce_for_file(&1, io_device, task.app))
     File.close(io_device)
+    :ok
   end
 
-  defp execute_task(_task), do: Logger.info("Invalid Task")
+  defp execute_task(_task) do
+    Logger.info("Invalid Task")
+    :ok
+  end
 
   defp is_correct_reducer_file?(file, reducer) do
     String.split(file, "-")
@@ -108,27 +122,28 @@ defmodule Dmapred.Worker do
     |> String.to_integer() === reducer
   end
 
-  defp store_intermediate_output(kv_list) do
+  @spec store_intermediate_output(kv_list :: list(), task_id :: number()) :: :ok
+  defp store_intermediate_output(kv_list, task_id) do
     intermediate_chunks =
       Enum.sort(kv_list)
       |> Enum.chunk_by(fn {k, _v} -> k end)
 
-    write_to_file(intermediate_chunks)
+    write_to_file(intermediate_chunks, task_id)
   end
 
-  defp write_to_file(intermediate_chunks, io_devices \\ %{})
+  defp write_to_file(intermediate_chunks, task_id, io_devices \\ %{})
 
-  defp write_to_file([], io_devices) do
+  defp write_to_file([], _task_id, io_devices) do
     Enum.each(io_devices, fn {_file, io_device} ->
       File.close(io_device)
     end)
   end
 
-  defp write_to_file([h | t], io_devices) do
+  defp write_to_file([h | t], task_id, io_devices) do
     [{key, _value} | _rest_kv] = h
-    x = 1
-    y = rem(:erlang.phash2(key), 10)
-    filename = "intermediates/mr-#{x}-#{y}"
+    map_task_id = task_id
+    reduce_task_id = rem(:erlang.phash2(key), Application.fetch_env!(:dmapred, :nreduce))
+    filename = "intermediates/mr-#{map_task_id}-#{reduce_task_id}"
 
     io_device =
       case Map.has_key?(io_devices, filename) do
@@ -140,7 +155,11 @@ defmodule Dmapred.Worker do
       IO.write(io_device, "#{k}:#{v}\n")
     end)
 
-    write_to_file(t, Map.update(io_devices, filename, io_device, fn _device -> io_device end))
+    write_to_file(
+      t,
+      task_id,
+      Map.update(io_devices, filename, io_device, fn _device -> io_device end)
+    )
   end
 
   defp apply_reduce_for_file(intermediate_file, io_device, app) do

@@ -38,7 +38,20 @@ defmodule Dmapred.Master do
   @spec init(any) :: {:ok, master_state()}
   def init(opts) do
     Logger.info("Master inited #{inspect(opts)}")
-    {:ok, %{name: :master, input_files: [], tasks: %{}, task_count: 0, app: nil, nReduce: 0}}
+    input_location = Application.fetch_env!(:dmapred, :files)
+
+    input_files =
+      File.ls!(input_location) |> Enum.map(fn input_file -> "#{input_location}/#{input_file}" end)
+
+    {:ok,
+     %{
+       name: :master,
+       input_files: input_files,
+       tasks: %{},
+       task_count: 0,
+       app: Application.fetch_env!(:dmapred, :app),
+       nReduce: Application.fetch_env!(:dmapred, :nreduce)
+     }}
   end
 
   @impl true
