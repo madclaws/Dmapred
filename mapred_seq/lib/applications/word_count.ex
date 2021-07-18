@@ -20,5 +20,4 @@ defmodule WordCount do
   def reduce_fn(_key, values) do
     Enum.count(values)
   end
-
 end

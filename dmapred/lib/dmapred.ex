@@ -24,6 +24,5 @@ defmodule Dmapred do
     Logger.info("input location => #{inspect(input_location)}")
     Logger.info("App => #{inspect(app)}")
     Logger.info("Reducer count => #{inspect(nReduce)}")
-    Dmapred.Master.init_data(input_location, app, nReduce)
   end
 end

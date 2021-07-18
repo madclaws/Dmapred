@@ -34,26 +34,19 @@ defmodule Dmapred.Worker do
   @impl true
   def handle_cast({"request_task", worker_id}, state) do
     task = Dmapred.Master.give_task(worker_id)
-    Logger.info("Task Received \n #{inspect(task)}")
+    IO.puts("Task Received \n #{inspect(task)}")
 
     # A 1 second delay is to set the worker busy
     Process.send_after(self(), {:execute_task, task}, 1_000)
     {:noreply, %{state | status: :busy}}
   end
 
-  # @impl true
-  # def handle_cast("reduce_task_test", state) do
-  #   execute_task(%Dmapred.Task{
-  #     id: 2,
-  #     type: :reduce,
-  #     status: :in_progress,
-  #     input: "",
-  #     worker: :worker_2,
-  #     app: WordCount
-  #   })
-
-  #   {:noreply, state}
-  # end
+  @impl true
+  def handle_call(:stop_worker, _from, state) do
+    Logger.warn("Stopping worker #{inspect(state.name)}")
+    :init.stop()
+    {:reply, :ok, state}
+  end
 
   @impl true
   def handle_info("ping_master", %{name: name, status: :idle} = worker_state) do
@@ -70,8 +63,17 @@ defmodule Dmapred.Worker do
   end
 
   def handle_info({:execute_task, task}, state) do
-    :ok = execute_task(task)
+    case execute_task(task) do
+      :ok -> Dmapred.Master.task_completed(state.name, task.id, task.type)
+      _ -> true
+    end
+
     {:noreply, %{state | status: :idle}}
+  end
+
+  @impl true
+  def terminate(reason, %{name: name} = _state) do
+    Logger.warn("Terminating worker-#{inspect(name)} due to #{inspect(reason)}")
   end
 
   @spec connect_to_master() :: any()
@@ -98,7 +100,7 @@ defmodule Dmapred.Worker do
 
   defp execute_task(%Dmapred.Task{type: :reduce} = task) do
     # (k, List(v)) -> (k, v)
-    reducer = 2
+    reducer = task.id - 1
 
     intermediate_files =
       File.ls!("intermediates/")
@@ -106,14 +108,17 @@ defmodule Dmapred.Worker do
 
     Logger.info(inspect(intermediate_files))
     io_device = File.open!("outputs/mr-out-#{reducer}", [:write, :append, :utf8])
-    Enum.each(intermediate_files, &apply_reduce_for_file(&1, io_device, task.app))
+
+    concatenate_files(intermediate_files)
+    |> apply_reduce_for_list(io_device, task.app)
+
     File.close(io_device)
     :ok
   end
 
   defp execute_task(_task) do
     Logger.info("Invalid Task")
-    :ok
+    :error
   end
 
   defp is_correct_reducer_file?(file, reducer) do
@@ -162,14 +167,23 @@ defmodule Dmapred.Worker do
     )
   end
 
-  defp apply_reduce_for_file(intermediate_file, io_device, app) do
-    reduce_output =
-      File.read!("intermediates/#{intermediate_file}")
-      |> String.trim()
-      |> String.split("\n")
-      |> reduce_by_chunk(app)
+  defp concatenate_files(intermediate_files) do
+    concatenated_list =
+      Enum.reduce(intermediate_files, [], fn file, concat_list ->
+        content_list =
+          File.read!("intermediates/#{file}")
+          |> String.trim()
+          |> String.split("\n")
 
-    IO.write(io_device, reduce_output)
+        concat_list ++ content_list
+      end)
+
+    Enum.sort(concatenated_list)
+  end
+
+  defp apply_reduce_for_list(concat_list, io_device, app) do
+    reduce_by_chunk(concat_list, app)
+    |> then(&IO.write(io_device, &1))
   end
 
   defp reduce_by_chunk(lines, app, last_key \\ "", value_list \\ [], output \\ "")
