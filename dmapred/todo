@@ -1,4 +1,9 @@
-
+|> Mapreduce API in master. DONE.
 
 |> Write tests for all the isolated functionalities we wrote till now.
     and remember to to TDD from now on.
+
+2021-06-28 08:56:19
+|> Where are we -> We added 3sec ping for requesting from master.
+|> Have to test if the pinger is working or not (both in idle and busy case).
+|> Then we move on to `Task creation + timer creation` on master.

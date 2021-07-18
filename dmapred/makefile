@@ -1,5 +1,3 @@
-WORKER = "worker_1"
-APP=WordCount
 start_master:
 	iex --erl "-dmapred type master" --sname master@localhost -S mix
 

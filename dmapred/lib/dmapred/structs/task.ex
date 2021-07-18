@@ -1,4 +1,7 @@
 defmodule Dmapred.Task do
+  @moduledoc """
+  Module for defining the task struct and its utilities
+  """
   @type work_status :: :idle | :in_progress | :completed
   @type work_type :: :map | :reduce
 

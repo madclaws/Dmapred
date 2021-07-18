@@ -6,6 +6,7 @@ defmodule Dmapred.Master do
 
   use GenServer
   require Logger
+
   # Client functions
 
   @type master_state :: %{
@@ -14,12 +15,18 @@ defmodule Dmapred.Master do
           # Map of Dmapred.Task.t()
           tasks: %{},
           task_count: number(),
-          app: atom()
+          app: atom(),
+          nReduce: number()
         }
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: {:global, :master})
+  end
+
+  @spec init_data(input_location :: String.t(), app :: atom(), nReduce :: number()) :: atom()
+  def init_data(input_location, app, nReduce) do
+    GenServer.call({:global, :master}, {"init_data", input_location, app, nReduce})
   end
 
   def give_task(worker_id) do
@@ -30,10 +37,16 @@ defmodule Dmapred.Master do
   @impl true
   @spec init(any) :: {:ok, master_state()}
   def init(opts) do
-    Logger.info("Master started #{inspect(opts)}")
-    dirname = "../resources"
-    input_files = File.ls!(dirname) |> Enum.map(fn input_file -> "#{dirname}/#{input_file}" end)
-    {:ok, %{name: :master, input_files: input_files, tasks: %{}, task_count: 0, app: WordCount}}
+    Logger.info("Master inited #{inspect(opts)}")
+    {:ok, %{name: :master, input_files: [], tasks: %{}, task_count: 0, app: nil, nReduce: 0}}
+  end
+
+  @impl true
+  def handle_call({"init_data", input_location, app, nReduce}, _from, state) do
+    input_files =
+      File.ls!(input_location) |> Enum.map(fn input_file -> "#{input_location}/#{input_file}" end)
+
+    {:reply, :inited_data, %{state | input_files: input_files, app: app, nReduce: nReduce}}
   end
 
   @impl true

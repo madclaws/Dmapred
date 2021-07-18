@@ -8,15 +8,16 @@ defmodule Dmapred.Worker do
 
   require Logger
 
+  @type worker_state :: %{
+          name: atom(),
+          status: :idle | :busy
+        }
+
   # Client functions
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: {:global, Keyword.fetch!(opts, :name)})
-  end
-
-  def request_task(worker_id) do
-    GenServer.cast({:global, worker_id}, {"request_task", worker_id})
   end
 
   def reduce_task(worker_id) do
@@ -25,11 +26,11 @@ defmodule Dmapred.Worker do
 
   # server callbacks
   @impl true
-  @spec init(any) :: {:ok, map()}
+  @spec init(any) :: {:ok, worker_state()}
   def init(name: process_name) do
     Logger.info("Worker started #{inspect(process_name)}")
     connect_to_master()
-    {:ok, %{name: process_name}}
+    {:ok, %{name: process_name, status: :idle}}
   end
 
   @impl true
@@ -54,11 +55,27 @@ defmodule Dmapred.Worker do
     {:noreply, state}
   end
 
+  @impl true
+  def handle_info("ping_master", %{name: name, status: :idle} = worker_state) do
+    GenServer.cast(self(), {"request_task", name})
+    Process.send_after(self(), "ping_master", 3_000)
+    {:noreply, worker_state}
+  end
+
+  def handle_info("ping_master", worker_state) do
+    Process.send_after(self(), "ping_master", 3_000)
+    {:noreply, worker_state}
+  end
+
   @spec connect_to_master() :: any()
   defp connect_to_master do
     case Node.connect(:master@localhost) do
-      true -> Logger.info("Connected to master")
-      _ -> Logger.info("Failed: Connecting to master")
+      true ->
+        Logger.info("Connected to master")
+        Process.send_after(self(), "ping_master", 3_000)
+
+      _ ->
+        Logger.info("Failed: Connecting to master")
     end
   end
 
@@ -119,7 +136,7 @@ defmodule Dmapred.Worker do
         _ -> File.open!(filename, [:write, :append, :utf8])
       end
 
-    Enum.map(h, fn {k, v} ->
+    Enum.each(h, fn {k, v} ->
       IO.write(io_device, "#{k}:#{v}\n")
     end)
 
