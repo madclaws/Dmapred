@@ -7,14 +7,18 @@ This project is a demo of Distributed Mapreduce systems using Elixir.
 
 - Distributed network is done by in-built distributive primitives of Erlang. 
 - Project is inspired by [MIT's 6.824 Lab 1: MapReduce](http://nil.lcs.mit.edu/6.824/2020/labs/lab-mr.html)
+- [MapReduce paper](http://static.googleusercontent.com/media/research.google.com/en//archive/mapreduce-osdi04.pdf)
 
 ----------------
 ## Dmapred in action
+- We are doing parallel computing of the total wordcount of each word  in all the files in ``resources/`` using mapreduce programming model
 - There is 1 Master and 4 Workers
 - Top left window (largest pane) is the Master.
 - We starts the master first, and then workers.
+- The workers execute map/reduce tasks, while master delegates the task and orchestrates the operation
 - The intermediate files are generated at ``dmapred/intermediates``
-- The final files will be generated at ``dmapred/outputs``
+- The final wordcount result will be generated at ``dmapred/outputs``
+- The system is fault-tolerant on worker crashes
 
 ![](assets/dmapred.gif)
 
