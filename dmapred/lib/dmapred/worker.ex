@@ -107,11 +107,12 @@ defmodule Dmapred.Worker do
       |> Enum.filter(&is_correct_reducer_file?(&1, reducer))
 
     Logger.info(inspect(intermediate_files))
-    io_device = File.open!("outputs/mr-out-#{reducer}", [:write, :append, :utf8])
+    io_device = File.open!("outputs/mr-out-#{reducer}.tmp", [:write, :utf8])
 
     concatenate_files(intermediate_files)
     |> apply_reduce_for_list(io_device, task.app)
 
+    File.rename("outputs/mr-out-#{reducer}.tmp", "outputs/mr-out-#{reducer}")
     File.close(io_device)
     :ok
   end
@@ -148,17 +149,21 @@ defmodule Dmapred.Worker do
     [{key, _value} | _rest_kv] = h
     map_task_id = task_id
     reduce_task_id = rem(:erlang.phash2(key), Application.fetch_env!(:dmapred, :nreduce))
-    filename = "intermediates/mr-#{map_task_id}-#{reduce_task_id}"
+
+    # We start writing on tmp files, so that no partial writing if there is crash
+    filename = "intermediates/mr-#{map_task_id}-#{reduce_task_id}.tmp"
 
     io_device =
       case Map.has_key?(io_devices, filename) do
         true -> Map.get(io_devices, filename)
-        _ -> File.open!(filename, [:write, :append, :utf8])
+        _ -> File.open!(filename, [:write, :utf8])
       end
 
     Enum.each(h, fn {k, v} ->
       IO.write(io_device, "#{k}:#{v}\n")
     end)
+
+    File.rename(filename, "intermediates/mr-#{map_task_id}-#{reduce_task_id}")
 
     write_to_file(
       t,

@@ -64,8 +64,6 @@ defmodule Dmapred.Master do
         reduce_tasks_finished: 0
       }
       |> then(&create_reduce_tasks(0, &1))
-      |> tap(&IO.inspect(&1))
-
     Process.send_after(self(), :check_mapreduce_completion, 3_000)
     {:ok, state}
   end
@@ -131,7 +129,6 @@ defmodule Dmapred.Master do
           {tasks[task_id], false}
       end
 
-    # TODO: Managing temp files
     {:noreply,
      %{
        state
