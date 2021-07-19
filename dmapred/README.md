@@ -19,5 +19,7 @@ NOTE: **Master and all workers should be run on different terminals/windows**.
 
 ``` make start_worker target WORKER=worker3```
 
+``` make start_worker target WORKER=worker4```
+
 
 

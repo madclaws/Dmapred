@@ -45,7 +45,7 @@ defmodule Dmapred.Master do
   @impl true
   @spec init(any) :: {:ok, master_state()}
   def init(opts) do
-    Logger.info("Master inited #{inspect(opts)}")
+    Logger.info("Master started #{inspect(opts)}")
     input_location = Application.fetch_env!(:dmapred, :files)
 
     input_files =
@@ -71,24 +71,24 @@ defmodule Dmapred.Master do
   @impl true
   def handle_call({"on_give_task", worker_id}, _from, state) do
     {task, state} = get_task(worker_id, state)
-    IO.puts("Task generated => #{inspect(task)}")
+    # IO.puts("Task generated => #{inspect(task)}")
     start_task_timer(task)
     {:reply, task, state}
   end
 
   @impl true
   def handle_info({:worker_timeout, task_type, task_id}, %{tasks: tasks} = state) do
-    IO.puts("Timeout for #{inspect(task_type)}-#{inspect(task_id)}....")
+    # IO.puts("Timeout for #{inspect(task_type)}-#{inspect(task_id)}....")
     #     if the status is still :in_progress -> set the status back to idle
     #     Have to deal later with temp files.
     task =
       case Map.fetch!(tasks[task_id], :status) do
         :completed ->
-          IO.puts("Task #{inspect(task_type)}-#{inspect(task_id)} already completed..")
+          # Logger.warn("Task #{inspect(task_type)}-#{inspect(task_id)} already completed..")
           tasks[task_id]
 
         :in_progress ->
-          IO.puts("Task #{inspect(task_type)}-#{inspect(task_id)} still in progress..")
+          Logger.warn("Task #{inspect(task_type)}-#{inspect(task_id)} still in progress..")
           Map.update!(tasks[task_id], :status, fn _ -> :idle end)
 
         _ ->
@@ -116,16 +116,14 @@ defmodule Dmapred.Master do
 
   @impl true
   def handle_cast({:on_task_completed, worker_id, task_id, task_type}, %{tasks: tasks} = state) do
-    IO.puts("Task #{inspect(task_type)} #{task_id} completed by #{inspect(worker_id)}")
+    Logger.info("Task #{inspect(task_type)} #{task_id} completed by #{inspect(worker_id)}")
 
     {completed_task, can_increment} =
       case is_valid_event?(tasks[task_id], worker_id) do
         true ->
-          IO.puts("Valid completed event")
           {Map.update!(tasks[task_id], :status, fn _ -> :completed end), true}
 
         _ ->
-          IO.puts("Invalid completed event")
           {tasks[task_id], false}
       end
 
@@ -191,7 +189,6 @@ defmodule Dmapred.Master do
 
       idle_task ->
         idle_task
-        |> tap(&IO.puts(inspect(&1)))
         |> Map.update!(:status, fn _status -> :in_progress end)
         |> Map.update!(:worker, fn _ -> worker_id end)
         |> then(fn idle_task ->

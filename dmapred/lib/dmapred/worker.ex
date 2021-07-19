@@ -84,7 +84,7 @@ defmodule Dmapred.Worker do
         Process.send_after(self(), "ping_master", 3_000)
 
       _ ->
-        Logger.info("Failed: Connecting to master")
+        Logger.warn("Failed: Connecting to master")
     end
   end
 
@@ -94,7 +94,7 @@ defmodule Dmapred.Worker do
     content = File.read!(task.input)
     intermediate = task.app.map_fn(task.input, content)
     store_intermediate_output(intermediate, task.id)
-    Logger.warn("Map task #{task.id} finished...")
+    Logger.info("Map task #{task.id} finished...")
     :ok
   end
 
@@ -106,7 +106,7 @@ defmodule Dmapred.Worker do
       File.ls!("intermediates/")
       |> Enum.filter(&is_correct_reducer_file?(&1, reducer))
 
-    Logger.info(inspect(intermediate_files))
+    # Logger.info(inspect(intermediate_files))
     io_device = File.open!("outputs/mr-out-#{reducer}.tmp", [:write, :utf8])
 
     concatenate_files(intermediate_files)
@@ -118,7 +118,7 @@ defmodule Dmapred.Worker do
   end
 
   defp execute_task(_task) do
-    Logger.info("Invalid Task")
+    Logger.warn("Invalid Task")
     :error
   end
 
